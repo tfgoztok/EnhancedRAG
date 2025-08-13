@@ -144,7 +144,7 @@ public class MultiDocumentRAGService {
             try {
                 Set<String> keys = jedisPooled.keys(type.getPrefix() + "*");
                 int count = keys != null ? keys.size() : 0;
-                logger.info("Retrieved document count for " + type + " using key pattern: " + count);
+                logger.info("Retrieved embedding count for " + type + " using key pattern: " + count);
                 return count;
             } catch (Exception fallbackException) {
                 logger.warning("Failed to get document count for " + type + 

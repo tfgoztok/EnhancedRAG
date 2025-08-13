@@ -7,7 +7,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.logging.Logger;
 
-@Component
+//@Component
 public class StartupInitializer {
 
     private static final Logger logger = Logger.getLogger(StartupInitializer.class.getName());
@@ -18,7 +18,7 @@ public class StartupInitializer {
         this.documentIngestionService = documentIngestionService;
     }
 
-    @EventListener(ApplicationReadyEvent.class)
+//    @EventListener(ApplicationReadyEvent.class)
     public void initializeApplication() {
         logger.info("Application started - initializing document ingestion...");
         
