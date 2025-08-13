@@ -197,3 +197,24 @@ WARNING: sun.misc.Unsafe::allocateMemory will be removed in a future release
 2025-08-12T23:32:17.066-05:00  INFO 36402 --- [EnhancedRAG] [nio-8080-exec-8] c.p.E.service.DocumentIngestionService   : Document ingestion completed!
 2025-08-12T23:32:18.078-05:00  INFO 36402 --- [EnhancedRAG] [nio-8080-exec-9] c.p.E.controller.RAGController           : Fetching store status
 2025-08-12T23:32:23.614-05:00  INFO 36402 --- [EnhancedRAG] [nio-8080-exec-1] c.p.E.controller.RAGController           : Fetching store status
+2025-08-12T23:37:48.933-05:00  INFO 36402 --- [EnhancedRAG] [nio-8080-exec-3] c.p.E.controller.RAGController           : Processing demo query with index: 0
+2025-08-12T23:37:48.934-05:00  INFO 36402 --- [EnhancedRAG] [nio-8080-exec-3] c.p.E.service.MultiDocumentRAGService    : Processing multi-document query: How do I implement JWT authentication in Spring Boot and what are the security considerations?
+Error retrieving from MARKDOWN store: No such index idx:markdown
+Error retrieving from JSON store: No such index idx:json
+Error retrieving from TEXT store: No such index idx:text
+Error retrieving from PDF store: No such index idx:pdf
+2025-08-12T23:37:56.157-05:00  INFO 36402 --- [EnhancedRAG] [nio-8080-exec-5] c.p.E.controller.RAGController           : Processing demo query with index: 1
+2025-08-12T23:37:56.158-05:00  INFO 36402 --- [EnhancedRAG] [nio-8080-exec-5] c.p.E.service.MultiDocumentRAGService    : Processing multi-document query: What are the recommended database connection pool settings for high-traffic applications?
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  28:56 min
+[INFO] Finished at: 2025-08-12T23:38:33-05:00
+[INFO] ------------------------------------------------------------------------
+[ERROR] Failed to execute goal org.springframework.boot:spring-boot-maven-plugin:3.5.4:run (default-cli) on project EnhancedRAG: Process terminated with exit code: 137 -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoExecutionException
