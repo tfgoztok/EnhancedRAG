@@ -1,0 +1,22 @@
+FREQUENTLY ASKED QUESTIONS - Spring Boot Security
+
+Q: How do I implement JWT authentication in Spring Boot?
+A: Use Spring Security with JWT tokens. Configure JWT filters, create token providers, and implement custom authentication managers. Key steps include adding security dependencies, configuring WebSecurityConfigurerAdapter, and creating JWT utility classes for token generation and validation.
+
+Q: What are the most common JWT security vulnerabilities?
+A: Common vulnerabilities include weak signing keys, storing sensitive data in JWT payloads, not validating token signatures, missing token expiration, and lack of token revocation mechanisms. Always use HTTPS, implement proper key rotation, and validate all token claims.
+
+Q: How can I secure REST APIs with Spring Security?
+A: Implement stateless authentication using JWT tokens, configure CORS properly, use HTTPS only, implement rate limiting, validate all inputs, and use proper error handling that doesn't leak sensitive information.
+
+Q: What is the recommended session management strategy?
+A: For modern applications, use stateless JWT-based authentication. If sessions are required, implement session fixation protection, configure appropriate session timeouts, and limit concurrent sessions per user.
+
+Q: How do I handle password security in Spring Boot?
+A: Use BCrypt or Argon2 password encoders, implement strong password policies, require password changes periodically, and store passwords securely with proper salting and hashing.
+
+Q: What are Spring Security's built-in protection mechanisms?
+A: Spring Security provides CSRF protection, XSS filtering, clickjacking prevention, security headers, and SQL injection protection through proper parameter binding.
+
+Q: How do I implement role-based access control?
+A: Use @PreAuthorize annotations, configure method-level security, implement custom voter-based access decisions, and design hierarchical role structures with appropriate permissions.

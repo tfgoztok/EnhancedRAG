@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enhanced RAG - Multi-Document System</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .demo-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+        }
+        button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #2980b9;
+        }
+        .query-input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+        .response-container {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 5px;
+            margin-top: 15px;
+            border-left: 4px solid #3498db;
+        }
+        .sources-container {
+            margin-top: 15px;
+        }
+        .source-item {
+            background: white;
+            margin: 10px 0;
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 3px solid #e74c3c;
+        }
+        .loading {
+            text-align: center;
+            color: #7f8c8d;
+        }
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        .status-card {
+            background: #ecf0f1;
+            padding: 15px;
+            border-radius: 5px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Enhanced RAG Multi-Document System</h1>
+        <p style="text-align: center; color: #7f8c8d;">
+            Demonstrates RetrievalAugmentationAdvisor with cross-document synthesis from PDF, Markdown, JSON, and Text sources
+        </p>
+
+        <!-- System Status -->
+        <div class="demo-section">
+            <h2>📊 System Status</h2>
+            <button onclick="checkStatus()">Check Store Status</button>
+            <button onclick="ingestDocuments()">Ingest Sample Documents</button>
+            <div id="status-result"></div>
+        </div>
+
+        <!-- Demo Queries -->
+        <div class="demo-section">
+            <h2>🎯 Demo Queries</h2>
+            <p>Try these pre-configured queries that demonstrate multi-document synthesis:</p>
+            <button onclick="runDemoQuery(0)">JWT Authentication & Security</button>
+            <button onclick="runDemoQuery(1)">Database Connection Pool Settings</button>
+            <button onclick="runDemoQuery(2)">Redis Caching & Monitoring</button>
+            <div id="demo-result"></div>
+        </div>
+
+        <!-- Custom Query -->
+        <div class="demo-section">
+            <h2>💬 Custom Query</h2>
+            <textarea class="query-input" id="customQuery" placeholder="Enter your question here..." rows="3"></textarea>
+            <button onclick="runCustomQuery()">Query All Documents</button>
+            <div id="custom-result"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api/rag';
+
+        async function checkStatus() {
+            const resultDiv = document.getElementById('status-result');
+            resultDiv.innerHTML = '<div class="loading">Checking system status...</div>';
+            
+            try {
+                const response = await fetch(`${API_BASE}/status`);
+                const status = await response.json();
+                
+                let html = '<div class="status-grid">';
+                
+                // Document counts
+                Object.entries(status.documentCounts).forEach(([type, count]) => {
+                    const health = status.storeHealth[type] ? '🟢' : '🔴';
+                    html += `
+                        <div class="status-card">
+                            <strong>${type.toUpperCase()}</strong><br>
+                            ${health} ${count} documents
+                        </div>
+                    `;
+                });
+                
+                // Redis status
+                html += `
+                    <div class="status-card">
+                        <strong>REDIS</strong><br>
+                        ${status.redisConnectionStatus === 'Connected' ? '🟢' : '🔴'} ${status.redisConnectionStatus}
+                    </div>
+                `;
+                
+                html += '</div>';
+                resultDiv.innerHTML = html;
+                
+            } catch (error) {
+                resultDiv.innerHTML = `<div style="color: red;">Error: ${error.message}</div>`;
+            }
+        }
+
+        async function ingestDocuments() {
+            const resultDiv = document.getElementById('status-result');
+            resultDiv.innerHTML = '<div class="loading">Ingesting documents...</div>';
+            
+            try {
+                const response = await fetch(`${API_BASE}/ingest`, { method: 'POST' });
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    resultDiv.innerHTML = `<div style="color: green;">${result.message}</div>`;
+                    setTimeout(checkStatus, 1000); // Refresh status after ingestion
+                } else {
+                    resultDiv.innerHTML = `<div style="color: red;">${result.message}</div>`;
+                }
+                
+            } catch (error) {
+                resultDiv.innerHTML = `<div style="color: red;">Error: ${error.message}</div>`;
+            }
+        }
+
+        async function runDemoQuery(index) {
+            const resultDiv = document.getElementById('demo-result');
+            resultDiv.innerHTML = '<div class="loading">Processing demo query...</div>';
+            
+            try {
+                const response = await fetch(`${API_BASE}/demo/query/${index}`, { method: 'POST' });
+                const result = await response.json();
+                
+                displayResponse(result, resultDiv);
+                
+            } catch (error) {
+                resultDiv.innerHTML = `<div style="color: red;">Error: ${error.message}</div>`;
+            }
+        }
+
+        async function runCustomQuery() {
+            const query = document.getElementById('customQuery').value;
+            const resultDiv = document.getElementById('custom-result');
+            
+            if (!query.trim()) {
+                resultDiv.innerHTML = '<div style="color: red;">Please enter a question</div>';
+                return;
+            }
+            
+            resultDiv.innerHTML = '<div class="loading">Processing your query...</div>';
+            
+            try {
+                const response = await fetch(`${API_BASE}/query`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ question: query })
+                });
+                const result = await response.json();
+                
+                displayResponse(result, resultDiv);
+                
+            } catch (error) {
+                resultDiv.innerHTML = `<div style="color: red;">Error: ${error.message}</div>`;
+            }
+        }
+
+        function displayResponse(result, container) {
+            let html = `
+                <div class="response-container">
+                    <h3>📝 Answer</h3>
+                    <p>${result.answer}</p>
+                    
+                    <h3>📊 Source Breakdown</h3>
+                    <div class="status-grid">
+            `;
+            
+            Object.entries(result.sourceBreakdown).forEach(([type, count]) => {
+                html += `
+                    <div class="status-card">
+                        <strong>${type.toUpperCase()}</strong><br>
+                        ${count} sources
+                    </div>
+                `;
+            });
+            
+            html += `
+                    </div>
+                    <p><strong>Total Confidence:</strong> ${(result.totalConfidence * 100).toFixed(1)}%</p>
+                    
+                    <div class="sources-container">
+                        <h3>📚 Sources Used</h3>
+            `;
+            
+            result.sources.forEach((source, index) => {
+                html += `
+                    <div class="source-item">
+                        <strong>${source.type.toUpperCase()}: ${source.documentName}</strong>
+                        (Confidence: ${(source.confidence * 100).toFixed(1)}%)<br>
+                        <em>${source.content.substring(0, 200)}...</em>
+                    </div>
+                `;
+            });
+            
+            html += '</div></div>';
+            container.innerHTML = html;
+        }
+
+        // Check status on page load
+        window.onload = checkStatus;
+    </script>
+</body>
+</html>

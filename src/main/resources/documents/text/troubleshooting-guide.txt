@@ -1,0 +1,25 @@
+TROUBLESHOOTING GUIDE - Database and Caching Issues
+
+PROBLEM: Application runs out of database connections
+SOLUTION: Check HikariCP pool configuration. Increase maximum-pool-size if needed, but first investigate connection leaks. Use connection leak detection by setting leak-detection-threshold. Monitor active vs idle connections.
+
+PROBLEM: Slow database queries affecting performance  
+SOLUTION: Analyze query execution plans, add appropriate indexes, consider connection pool sizing, and implement query result caching. Monitor connection acquisition times and database response times.
+
+PROBLEM: Redis cache not working as expected
+SOLUTION: Verify Redis connection configuration, check cache key patterns, ensure proper serialization settings, and validate cache TTL values. Monitor cache hit/miss ratios and eviction patterns.
+
+PROBLEM: Memory issues with Redis caching
+SOLUTION: Configure appropriate maxmemory policies (allkeys-lru recommended), monitor memory usage patterns, implement proper cache expiration strategies, and consider Redis clustering for large datasets.
+
+PROBLEM: Connection pool exhaustion under high load
+SOLUTION: Tune pool parameters based on actual usage patterns. Increase pool size gradually while monitoring database server capacity. Implement connection retry logic and circuit breaker patterns.
+
+PROBLEM: Cache stampede affecting performance
+SOLUTION: Implement cache warming strategies, use refresh-ahead patterns, add jitter to cache expiration times, and consider using distributed locking for cache updates.
+
+PROBLEM: JWT token validation failures
+SOLUTION: Verify token signing keys, check token expiration handling, ensure proper clock synchronization between services, and implement appropriate error handling for invalid tokens.
+
+PROBLEM: Session management issues in clustered environment
+SOLUTION: Use external session storage (Redis), implement sticky sessions, or switch to stateless JWT-based authentication. Ensure session replication is properly configured.

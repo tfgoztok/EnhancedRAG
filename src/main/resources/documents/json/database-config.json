@@ -1,0 +1,38 @@
+{
+  "database_connection_pools": {
+    "hikari_recommended_settings": {
+      "maximum_pool_size": 20,
+      "minimum_idle": 10,
+      "connection_timeout_ms": 30000,
+      "idle_timeout_ms": 600000,
+      "max_lifetime_ms": 1800000,
+      "leak_detection_threshold_ms": 60000
+    },
+    "high_traffic_settings": {
+      "maximum_pool_size": 50,
+      "minimum_idle": 20,
+      "connection_timeout_ms": 60000,
+      "idle_timeout_ms": 300000,
+      "max_lifetime_ms": 1200000
+    },
+    "monitoring_metrics": [
+      "active_connections",
+      "idle_connections", 
+      "pending_threads",
+      "connection_creation_rate",
+      "connection_usage_time"
+    ]
+  },
+  "performance_benchmarks": {
+    "typical_response_times": {
+      "connection_acquisition_ms": 5,
+      "query_execution_ms": 50,
+      "total_request_ms": 100
+    },
+    "concurrent_user_capacity": {
+      "pool_size_10": 500,
+      "pool_size_20": 1000,
+      "pool_size_50": 2500
+    }
+  }
+}
