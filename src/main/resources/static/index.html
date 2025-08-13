@@ -223,33 +223,13 @@
                 <div class="response-container">
                     <h3>📝 Answer</h3>
                     <p>${result.answer}</p>
-                    
-                    <h3>📊 Source Breakdown</h3>
-                    <div class="status-grid">
-            `;
-            
-            Object.entries(result.sourceBreakdown).forEach(([type, count]) => {
-                html += `
-                    <div class="status-card">
-                        <strong>${type.toUpperCase()}</strong><br>
-                        ${count} sources
-                    </div>
-                `;
-            });
-            
-            html += `
-                    </div>
-                    <p><strong>Total Confidence:</strong> ${(result.totalConfidence * 100).toFixed(1)}%</p>
-                    
-                    <div class="sources-container">
-                        <h3>Sources Used</h3>
+                
             `;
             
             result.sources.forEach((source, index) => {
                 html += `
                     <div class="source-item">
-                        <strong>${source.type.toUpperCase()}: ${source.documentName}</strong>
-                        (Confidence: ${(source.confidence * 100).toFixed(1)}%)<br>
+                        <strong>${source.type.toUpperCase()}: ${source.documentName}</strong><br>
                         <em>${source.content.substring(0, 200)}...</em>
                     </div>
                 `;
