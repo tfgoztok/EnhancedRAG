@@ -1,17 +1,19 @@
 package cs544.project.EnhancedRAG.config;
 
-import cs544.project.EnhancedRAG.model.DocumentType;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.api.Advisor;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.document.Document;
 import org.springframework.ai.rag.advisor.RetrievalAugmentationAdvisor;
-import org.springframework.ai.rag.retrieval.search.VectorStoreDocumentRetriever;
+import org.springframework.ai.rag.generation.augmentation.ContextualQueryAugmenter;
+import org.springframework.ai.rag.retrieval.search.DocumentRetriever;
+import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
 
 @Configuration
 public class RAGAdvisorConfiguration {
@@ -21,59 +23,44 @@ public class RAGAdvisorConfiguration {
         return ChatClient.builder(chatModel).build();
     }
 
-    @Bean("pdfRetrievalAdvisor")
-    public Advisor pdfRetrievalAdvisor(VectorStore pdfVectorStore) {
-        return RetrievalAugmentationAdvisor.builder()
-                .documentRetriever(VectorStoreDocumentRetriever.builder()
-                        .similarityThreshold(0.50)
-                        .vectorStore(pdfVectorStore)
-                        .build())
-                .build();
-    }
-
-    @Bean("markdownRetrievalAdvisor")
-    public Advisor markdownRetrievalAdvisor(VectorStore markdownVectorStore) {
-        return RetrievalAugmentationAdvisor.builder()
-                .documentRetriever(VectorStoreDocumentRetriever.builder()
-                        .similarityThreshold(0.50)
-                        .vectorStore(markdownVectorStore)
-                        .build())
-                .build();
-    }
-
-    @Bean("jsonRetrievalAdvisor")
-    public Advisor jsonRetrievalAdvisor(VectorStore jsonVectorStore) {
-        return RetrievalAugmentationAdvisor.builder()
-                .documentRetriever(VectorStoreDocumentRetriever.builder()
-                        .similarityThreshold(0.50)
-                        .vectorStore(jsonVectorStore)
-                        .build())
-                .build();
-    }
-
-    @Bean("textRetrievalAdvisor")
-    public Advisor textRetrievalAdvisor(VectorStore textVectorStore) {
-        return RetrievalAugmentationAdvisor.builder()
-                .documentRetriever(VectorStoreDocumentRetriever.builder()
-                        .similarityThreshold(0.50)
-                        .vectorStore(textVectorStore)
-                        .build())
-                .build();
+    @Bean
+    public DocumentRetriever multiStoreDocumentRetriever(
+            VectorStore pdfVectorStore,
+            VectorStore markdownVectorStore,
+            VectorStore jsonVectorStore,
+            VectorStore textVectorStore) {
+        
+        return query -> {
+            List<Document> allDocuments = new ArrayList<>();
+            List<VectorStore> stores = List.of(pdfVectorStore, markdownVectorStore, jsonVectorStore, textVectorStore);
+            
+            // Search across all vector stores
+            for (VectorStore store : stores) {
+                try {
+                    SearchRequest searchRequest = SearchRequest.builder()
+                        .query(query.toString())
+                        .similarityThreshold(0.75)
+                        .topK(3)
+                        .build();
+                    List<Document> documents = store.similaritySearch(searchRequest);
+                    allDocuments.addAll(documents);
+                } catch (Exception e) {
+                    // Log and continue with other stores
+                    System.err.println("Error searching store: " + e.getMessage());
+                }
+            }
+            
+            return allDocuments;
+        };
     }
 
     @Bean
-    public Map<DocumentType, Advisor> ragAdvisorMap(
-            Advisor pdfRetrievalAdvisor,
-            Advisor markdownRetrievalAdvisor,
-            Advisor jsonRetrievalAdvisor,
-            Advisor textRetrievalAdvisor) {
-        
-        Map<DocumentType, Advisor> advisorMap = new HashMap<>();
-        advisorMap.put(DocumentType.PDF, pdfRetrievalAdvisor);
-        advisorMap.put(DocumentType.MARKDOWN, markdownRetrievalAdvisor);
-        advisorMap.put(DocumentType.JSON, jsonRetrievalAdvisor);
-        advisorMap.put(DocumentType.TEXT, textRetrievalAdvisor);
-        
-        return advisorMap;
+    public Advisor multiDocumentRetrievalAdvisor(DocumentRetriever multiStoreDocumentRetriever) {
+        return RetrievalAugmentationAdvisor.builder()
+                .documentRetriever(multiStoreDocumentRetriever)
+                .queryAugmenter(ContextualQueryAugmenter.builder()
+                .allowEmptyContext(true)
+                .build())
+                .build();
     }
 }

@@ -20,18 +20,18 @@ public class MultiDocumentRAGService {
     private static final Logger logger = Logger.getLogger(MultiDocumentRAGService.class.getName());
     
     private final ChatClient chatClient;
-    private final Map<DocumentType, Advisor> ragAdvisorMap;
+    private final Advisor multiDocumentRetrievalAdvisor;
     private final Map<DocumentType, VectorStore> vectorStores;
     private final RedisTemplate<String, Object> redisTemplate;
     private final JedisPooled jedisPooled;
 
     public MultiDocumentRAGService(ChatClient chatClient, 
-                                 Map<DocumentType, Advisor> ragAdvisorMap,
+                                 Advisor multiDocumentRetrievalAdvisor,
                                  Map<DocumentType, VectorStore> vectorStores,
                                  RedisTemplate<String, Object> redisTemplate,
                                  JedisPooled jedisPooled) {
         this.chatClient = chatClient;
-        this.ragAdvisorMap = ragAdvisorMap;
+        this.multiDocumentRetrievalAdvisor = multiDocumentRetrievalAdvisor;
         this.vectorStores = vectorStores;
         this.redisTemplate = redisTemplate;
         this.jedisPooled = jedisPooled;
@@ -41,42 +41,14 @@ public class MultiDocumentRAGService {
         logger.info("Processing multi-document query: " + question);
         
         try {
-            List<DocumentSource> allSources = new ArrayList<>();
-            Map<String, Integer> sourceBreakdown = new HashMap<>();
-            List<String> answers = new ArrayList<>();
+            // Use the single multi-document advisor to get answer from all stores
+            String answer = chatClient.prompt()
+                    .user(question)
+                    .advisors(multiDocumentRetrievalAdvisor)
+                    .call()
+                    .content();
             
-            // Query each document type using its specific advisor
-            for (Map.Entry<DocumentType, Advisor> entry : ragAdvisorMap.entrySet()) {
-                DocumentType type = entry.getKey();
-                Advisor advisor = entry.getValue();
-                
-                try {
-                    String typeSpecificAnswer = chatClient.prompt()
-                            .user(question)
-                            .advisors(advisor)
-                            .call()
-                            .content();
-                    
-                    if (typeSpecificAnswer != null && !typeSpecificAnswer.trim().isEmpty()) {
-                        answers.add("From " + type.name().toLowerCase() + " documents: " + typeSpecificAnswer);
-                        
-                        // Create a document source for tracking
-                        DocumentSource source = new DocumentSource(
-                                type.name().toLowerCase(),
-                                typeSpecificAnswer,
-                                0.8, // Default confidence since we don't have access to similarity scores
-                                "RAG-generated-from-" + type.name().toLowerCase(),
-                                "Retrieved using RetrievalAugmentationAdvisor"
-                        );
-                        allSources.add(source);
-                        sourceBreakdown.merge(type.name().toLowerCase(), 1, Integer::sum);
-                    }
-                } catch (Exception e) {
-                    logger.warning("Error querying " + type + " store: " + e.getMessage());
-                }
-            }
-            
-            if (answers.isEmpty()) {
+            if (answer == null || answer.trim().isEmpty()) {
                 return new MultiDocumentResponse(
                     "I couldn't find relevant information in any of the document stores to answer your question.",
                     new ArrayList<>(),
@@ -85,19 +57,24 @@ public class MultiDocumentRAGService {
                 );
             }
             
-            // Synthesize final answer by combining all type-specific answers
-            String synthesisPrompt = buildSynthesisPrompt(question, answers);
-            String finalAnswer = chatClient.prompt()
-                    .user(synthesisPrompt)
-                    .call()
-                    .content();
+            // Create a simple source attribution since we're using a single advisor
+            List<DocumentSource> allSources = new ArrayList<>();
+            Map<String, Integer> sourceBreakdown = new HashMap<>();
             
-            // Calculate average confidence
-            double totalConfidence = calculateTotalConfidence(allSources);
+            // Create a single source entry representing the multi-document search
+            DocumentSource source = new DocumentSource(
+                    "multi-document",
+                    answer,
+                    0.8, // Default confidence
+                    "multi-document-rag",
+                    "Retrieved using single RetrievalAugmentationAdvisor across all stores"
+            );
+            allSources.add(source);
+            sourceBreakdown.put("multi-document", 1);
             
-            logger.info("Successfully generated multi-document response from " + allSources.size() + " sources");
+            logger.info("Successfully generated multi-document response");
             
-            return new MultiDocumentResponse(finalAnswer, allSources, sourceBreakdown, totalConfidence);
+            return new MultiDocumentResponse(answer, allSources, sourceBreakdown, 0.8);
             
         } catch (Exception e) {
             logger.severe("Error processing multi-document query: " + e.getMessage());
@@ -108,24 +85,6 @@ public class MultiDocumentRAGService {
                 0.0
             );
         }
-    }
-
-    private String buildSynthesisPrompt(String originalQuestion, List<String> typeSpecificAnswers) {
-        StringBuilder prompt = new StringBuilder();
-        prompt.append("You are tasked with synthesizing information from multiple document types to provide a comprehensive answer.\n\n");
-        prompt.append("Original Question: ").append(originalQuestion).append("\n\n");
-        prompt.append("I have gathered the following information from different document types:\n\n");
-        
-        for (int i = 0; i < typeSpecificAnswers.size(); i++) {
-            prompt.append(i + 1).append(". ").append(typeSpecificAnswers.get(i)).append("\n\n");
-        }
-        
-        prompt.append("Please synthesize this information into a coherent, comprehensive answer. ");
-        prompt.append("Highlight the key points from each source and show how they relate to each other. ");
-        prompt.append("If there are conflicting information, please note the discrepancies. ");
-        prompt.append("Make your response well-structured and informative.");
-        
-        return prompt.toString();
     }
 
     public StoreStatus getStoreStatus() {
@@ -201,22 +160,6 @@ public class MultiDocumentRAGService {
                 return 0;
             }
         }
-    }
-
-    private double calculateTotalConfidence(List<DocumentSource> sources) {
-        if (sources.isEmpty()) {
-            return 0.0;
-        }
-        
-        double totalConfidence = sources.stream()
-                .mapToDouble(DocumentSource::getConfidence)
-                .average()
-                .orElse(0.0);
-        
-        // Apply a penalty for having fewer sources
-        double sourcePenalty = Math.min(1.0, sources.size() / 4.0);
-        
-        return totalConfidence * sourcePenalty;
     }
 
     public List<String> getDemoQueries() {
