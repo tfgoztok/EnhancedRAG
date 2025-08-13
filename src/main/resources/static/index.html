@@ -92,15 +92,15 @@
 
         <!-- System Status -->
         <div class="demo-section">
-            <h2>📊 System Status</h2>
+            <h2>System Status</h2>
             <button onclick="checkStatus()">Check Store Status</button>
-            <button onclick="ingestDocuments()">Ingest Sample Documents</button>
+            <!-- < button onclick="ingestDocuments()">Ingest Sample Documents</button> -->
             <div id="status-result"></div>
         </div>
 
         <!-- Demo Queries -->
         <div class="demo-section">
-            <h2>🎯 Demo Queries</h2>
+            <h2>Demo Queries</h2>
             <p>Try these pre-configured queries that demonstrate multi-document synthesis:</p>
             <button onclick="runDemoQuery(0)">JWT Authentication & Security</button>
             <button onclick="runDemoQuery(1)">Database Connection Pool Settings</button>
@@ -110,7 +110,7 @@
 
         <!-- Custom Query -->
         <div class="demo-section">
-            <h2>💬 Custom Query</h2>
+            <h2>Custom Query</h2>
             <textarea class="query-input" id="customQuery" placeholder="Enter your question here..." rows="3"></textarea>
             <button onclick="runCustomQuery()">Query All Documents</button>
             <div id="custom-result"></div>
@@ -136,7 +136,7 @@
                     html += `
                         <div class="status-card">
                             <strong>${type.toUpperCase()}</strong><br>
-                            ${health} ${count} documents
+                            ${health} ${count} embeddings
                         </div>
                     `;
                 });
@@ -242,7 +242,7 @@
                     <p><strong>Total Confidence:</strong> ${(result.totalConfidence * 100).toFixed(1)}%</p>
                     
                     <div class="sources-container">
-                        <h3>📚 Sources Used</h3>
+                        <h3>Sources Used</h3>
             `;
             
             result.sources.forEach((source, index) => {

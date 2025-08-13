@@ -18,7 +18,7 @@ public class CrossReferenceAdvisor {
 
     public CrossReferenceAdvisor(Map<DocumentType, VectorStore> vectorStores) {
         this.vectorStores = vectorStores;
-        this.topK = 8; // Default top K results
+        this.topK = 3; // Default top K results
     }
 
     public List<DocumentSource> retrieveFromAllStores(String query) {

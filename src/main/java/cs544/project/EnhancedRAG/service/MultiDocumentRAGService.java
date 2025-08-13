@@ -9,6 +9,7 @@ import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
+import redis.clients.jedis.JedisPooled;
 
 import java.util.*;
 import java.util.logging.Logger;
@@ -22,15 +23,18 @@ public class MultiDocumentRAGService {
     private final CrossReferenceAdvisor crossReferenceAdvisor;
     private final Map<DocumentType, VectorStore> vectorStores;
     private final RedisTemplate<String, Object> redisTemplate;
+    private final JedisPooled jedisPooled;
 
     public MultiDocumentRAGService(ChatModel chatModel, 
                                  CrossReferenceAdvisor crossReferenceAdvisor,
                                  Map<DocumentType, VectorStore> vectorStores,
-                                 RedisTemplate<String, Object> redisTemplate) {
+                                 RedisTemplate<String, Object> redisTemplate,
+                                 JedisPooled jedisPooled) {
         this.chatModel = chatModel;
         this.crossReferenceAdvisor = crossReferenceAdvisor;
         this.vectorStores = vectorStores;
         this.redisTemplate = redisTemplate;
+        this.jedisPooled = jedisPooled;
     }
 
     public MultiDocumentResponse queryMultipleStores(String question) {
@@ -114,19 +118,40 @@ public class MultiDocumentRAGService {
     }
 
     private int getEstimatedDocumentCount(DocumentType type) {
-        // This is a simplified implementation
-        // In a real scenario, you'd query the Redis indices directly
-        switch (type) {
-            case PDF:
-                return 3; // Estimated based on our sample documents
-            case MARKDOWN:
-                return 3;
-            case JSON:
-                return 2;
-            case TEXT:
-                return 2;
-            default:
+        try {
+            // Query Redis directly using FT.INFO command to get real document counts
+            Object result = jedisPooled.sendCommand(
+                redis.clients.jedis.Protocol.Command.valueOf("FT.INFO"),
+                type.getIndexName()
+            );
+            
+            if (result instanceof List<?>) {
+                List<?> infoList = (List<?>) result;
+                // Parse the FT.INFO response to extract document count
+                // The response format typically includes "num_docs" field
+                for (int i = 0; i < infoList.size() - 1; i++) {
+                    if ("num_docs".equals(String.valueOf(infoList.get(i)))) {
+                        return Integer.parseInt(String.valueOf(infoList.get(i + 1)));
+                    }
+                }
+            }
+            
+            logger.warning("Could not parse document count from FT.INFO response for " + type);
+            return 0;
+            
+        } catch (Exception e) {
+            // Fall back to counting keys with the document prefix
+            try {
+                Set<String> keys = jedisPooled.keys(type.getPrefix() + "*");
+                int count = keys != null ? keys.size() : 0;
+                logger.info("Retrieved document count for " + type + " using key pattern: " + count);
+                return count;
+            } catch (Exception fallbackException) {
+                logger.warning("Failed to get document count for " + type + 
+                             ". FT.INFO error: " + e.getMessage() + 
+                             ", Keys fallback error: " + fallbackException.getMessage());
                 return 0;
+            }
         }
     }
 
