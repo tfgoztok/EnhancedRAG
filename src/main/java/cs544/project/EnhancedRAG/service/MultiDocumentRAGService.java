@@ -1,11 +1,11 @@
 package cs544.project.EnhancedRAG.service;
 
-import cs544.project.EnhancedRAG.advisor.CrossReferenceAdvisor;
 import cs544.project.EnhancedRAG.model.DocumentSource;
 import cs544.project.EnhancedRAG.model.DocumentType;
 import cs544.project.EnhancedRAG.model.MultiDocumentResponse;
 import cs544.project.EnhancedRAG.model.StoreStatus;
-import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.advisor.api.Advisor;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
@@ -19,19 +19,19 @@ public class MultiDocumentRAGService {
 
     private static final Logger logger = Logger.getLogger(MultiDocumentRAGService.class.getName());
     
-    private final ChatModel chatModel;
-    private final CrossReferenceAdvisor crossReferenceAdvisor;
+    private final ChatClient chatClient;
+    private final Map<DocumentType, Advisor> ragAdvisorMap;
     private final Map<DocumentType, VectorStore> vectorStores;
     private final RedisTemplate<String, Object> redisTemplate;
     private final JedisPooled jedisPooled;
 
-    public MultiDocumentRAGService(ChatModel chatModel, 
-                                 CrossReferenceAdvisor crossReferenceAdvisor,
+    public MultiDocumentRAGService(ChatClient chatClient, 
+                                 Map<DocumentType, Advisor> ragAdvisorMap,
                                  Map<DocumentType, VectorStore> vectorStores,
                                  RedisTemplate<String, Object> redisTemplate,
                                  JedisPooled jedisPooled) {
-        this.chatModel = chatModel;
-        this.crossReferenceAdvisor = crossReferenceAdvisor;
+        this.chatClient = chatClient;
+        this.ragAdvisorMap = ragAdvisorMap;
         this.vectorStores = vectorStores;
         this.redisTemplate = redisTemplate;
         this.jedisPooled = jedisPooled;
@@ -41,10 +41,42 @@ public class MultiDocumentRAGService {
         logger.info("Processing multi-document query: " + question);
         
         try {
-            // Retrieve relevant documents from all stores
-            List<DocumentSource> sources = crossReferenceAdvisor.retrieveFromAllStores(question);
+            List<DocumentSource> allSources = new ArrayList<>();
+            Map<String, Integer> sourceBreakdown = new HashMap<>();
+            List<String> answers = new ArrayList<>();
             
-            if (sources.isEmpty()) {
+            // Query each document type using its specific advisor
+            for (Map.Entry<DocumentType, Advisor> entry : ragAdvisorMap.entrySet()) {
+                DocumentType type = entry.getKey();
+                Advisor advisor = entry.getValue();
+                
+                try {
+                    String typeSpecificAnswer = chatClient.prompt()
+                            .user(question)
+                            .advisors(advisor)
+                            .call()
+                            .content();
+                    
+                    if (typeSpecificAnswer != null && !typeSpecificAnswer.trim().isEmpty()) {
+                        answers.add("From " + type.name().toLowerCase() + " documents: " + typeSpecificAnswer);
+                        
+                        // Create a document source for tracking
+                        DocumentSource source = new DocumentSource(
+                                type.name().toLowerCase(),
+                                typeSpecificAnswer,
+                                0.8, // Default confidence since we don't have access to similarity scores
+                                "RAG-generated-from-" + type.name().toLowerCase(),
+                                "Retrieved using RetrievalAugmentationAdvisor"
+                        );
+                        allSources.add(source);
+                        sourceBreakdown.merge(type.name().toLowerCase(), 1, Integer::sum);
+                    }
+                } catch (Exception e) {
+                    logger.warning("Error querying " + type + " store: " + e.getMessage());
+                }
+            }
+            
+            if (answers.isEmpty()) {
                 return new MultiDocumentResponse(
                     "I couldn't find relevant information in any of the document stores to answer your question.",
                     new ArrayList<>(),
@@ -53,21 +85,19 @@ public class MultiDocumentRAGService {
                 );
             }
             
-            // Build enhanced prompt with cross-referenced sources
-            String enhancedPrompt = crossReferenceAdvisor.buildEnhancedPrompt(question, sources);
+            // Synthesize final answer by combining all type-specific answers
+            String synthesisPrompt = buildSynthesisPrompt(question, answers);
+            String finalAnswer = chatClient.prompt()
+                    .user(synthesisPrompt)
+                    .call()
+                    .content();
             
-            // Generate response using chat model
-            String answer = chatModel.call(enhancedPrompt);
+            // Calculate average confidence
+            double totalConfidence = calculateTotalConfidence(allSources);
             
-            // Calculate source breakdown
-            Map<String, Integer> sourceBreakdown = crossReferenceAdvisor.calculateSourceBreakdown(sources);
+            logger.info("Successfully generated multi-document response from " + allSources.size() + " sources");
             
-            // Calculate total confidence
-            double totalConfidence = calculateTotalConfidence(sources);
-            
-            logger.info("Successfully generated multi-document response with " + sources.size() + " sources");
-            
-            return new MultiDocumentResponse(answer, sources, sourceBreakdown, totalConfidence);
+            return new MultiDocumentResponse(finalAnswer, allSources, sourceBreakdown, totalConfidence);
             
         } catch (Exception e) {
             logger.severe("Error processing multi-document query: " + e.getMessage());
@@ -78,6 +108,24 @@ public class MultiDocumentRAGService {
                 0.0
             );
         }
+    }
+
+    private String buildSynthesisPrompt(String originalQuestion, List<String> typeSpecificAnswers) {
+        StringBuilder prompt = new StringBuilder();
+        prompt.append("You are tasked with synthesizing information from multiple document types to provide a comprehensive answer.\n\n");
+        prompt.append("Original Question: ").append(originalQuestion).append("\n\n");
+        prompt.append("I have gathered the following information from different document types:\n\n");
+        
+        for (int i = 0; i < typeSpecificAnswers.size(); i++) {
+            prompt.append(i + 1).append(". ").append(typeSpecificAnswers.get(i)).append("\n\n");
+        }
+        
+        prompt.append("Please synthesize this information into a coherent, comprehensive answer. ");
+        prompt.append("Highlight the key points from each source and show how they relate to each other. ");
+        prompt.append("If there are conflicting information, please note the discrepancies. ");
+        prompt.append("Make your response well-structured and informative.");
+        
+        return prompt.toString();
     }
 
     public StoreStatus getStoreStatus() {
