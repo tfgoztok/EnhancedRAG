@@ -45,8 +45,6 @@ src/main/java/cs544/project/EnhancedRAG/
 │   ├── DocumentSource.java                   # Source attribution model
 │   ├── MultiDocumentResponse.java            # API response model
 │   └── StoreStatus.java                      # System status model
-├── advisor/
-│   └── CrossReferenceAdvisor.java            # Multi-document retrieval logic
 └── EnhancedRagApplication.java               # Main application class
 
 src/main/resources/
