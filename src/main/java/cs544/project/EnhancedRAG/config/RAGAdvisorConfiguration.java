@@ -38,7 +38,7 @@ public class RAGAdvisorConfiguration {
                 try {
                     SearchRequest searchRequest = SearchRequest.builder()
                         .query(query.toString())
-                        .similarityThreshold(0.5)
+                        .similarityThreshold(0.9)
                         .build();
                     List<Document> documents = store.similaritySearch(searchRequest);
                     allDocuments.addAll(documents);
