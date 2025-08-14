@@ -86,7 +86,7 @@ src/main/resources/
 
 1. **Clone the Repository**
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/tfgoztok/EnhancedRAG.git
    cd EnhancedRAG
    ```
 
