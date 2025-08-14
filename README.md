@@ -109,6 +109,9 @@ src/main/resources/
 5. **Open Demo Interface**
    Navigate to: http://localhost:8080
 
+6. **Ingest Sample Documents**
+   Click 'Ingest Sample Documents' for 1 time to digest documents (in /main/resources/documents) into Redis Vector store as embeddings. It takes close to 30seconds because there are 2 big PDF files (more than 2k pages). You can change the documents as you wish.
+
 ## 📡 API Endpoints
 
 ### System Management
