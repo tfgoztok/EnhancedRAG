@@ -34,18 +34,15 @@ public class RAGAdvisorConfiguration {
             List<Document> allDocuments = new ArrayList<>();
             List<VectorStore> stores = List.of(pdfVectorStore, markdownVectorStore, jsonVectorStore, textVectorStore);
             
-            // Search across all vector stores
             for (VectorStore store : stores) {
                 try {
                     SearchRequest searchRequest = SearchRequest.builder()
                         .query(query.toString())
-                        .similarityThreshold(0.75)
-                        .topK(3)
+                        .similarityThreshold(0.5)
                         .build();
                     List<Document> documents = store.similaritySearch(searchRequest);
                     allDocuments.addAll(documents);
                 } catch (Exception e) {
-                    // Log and continue with other stores
                     System.err.println("Error searching store: " + e.getMessage());
                 }
             }
@@ -59,8 +56,8 @@ public class RAGAdvisorConfiguration {
         return RetrievalAugmentationAdvisor.builder()
                 .documentRetriever(multiStoreDocumentRetriever)
                 .queryAugmenter(ContextualQueryAugmenter.builder()
-                .allowEmptyContext(true)
-                .build())
+                        .allowEmptyContext(true)
+                        .build())
                 .build();
     }
 }

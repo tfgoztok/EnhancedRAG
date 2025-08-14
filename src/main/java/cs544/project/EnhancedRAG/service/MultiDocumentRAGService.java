@@ -6,6 +6,9 @@ import cs544.project.EnhancedRAG.model.MultiDocumentResponse;
 import cs544.project.EnhancedRAG.model.StoreStatus;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.api.Advisor;
+import org.springframework.ai.document.Document;
+import org.springframework.ai.rag.Query;
+import org.springframework.ai.rag.retrieval.search.DocumentRetriever;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
@@ -24,24 +27,27 @@ public class MultiDocumentRAGService {
     private final Map<DocumentType, VectorStore> vectorStores;
     private final RedisTemplate<String, Object> redisTemplate;
     private final JedisPooled jedisPooled;
+    private final DocumentRetriever multiStoreDocumentRetriever;
 
     public MultiDocumentRAGService(ChatClient chatClient, 
                                  Advisor multiDocumentRetrievalAdvisor,
                                  Map<DocumentType, VectorStore> vectorStores,
                                  RedisTemplate<String, Object> redisTemplate,
-                                 JedisPooled jedisPooled) {
+                                 JedisPooled jedisPooled,
+                                 DocumentRetriever multiStoreDocumentRetriever) {
         this.chatClient = chatClient;
         this.multiDocumentRetrievalAdvisor = multiDocumentRetrievalAdvisor;
         this.vectorStores = vectorStores;
         this.redisTemplate = redisTemplate;
         this.jedisPooled = jedisPooled;
+        this.multiStoreDocumentRetriever = multiStoreDocumentRetriever;
     }
 
     public MultiDocumentResponse queryMultipleStores(String question) {
         logger.info("Processing multi-document query: " + question);
         
         try {
-            // Use the single multi-document advisor to get answer from all stores
+            // Simply use the RetrievalAugmentationAdvisor - it handles everything
             String answer = chatClient.prompt()
                     .user(question)
                     .advisors(multiDocumentRetrievalAdvisor)
@@ -50,30 +56,41 @@ public class MultiDocumentRAGService {
             
             if (answer == null || answer.trim().isEmpty()) {
                 return new MultiDocumentResponse(
-                    "I couldn't find relevant information in any of the document stores to answer your question.",
+                    "I couldn't find relevant information to answer your question.",
                     new ArrayList<>(),
                     new HashMap<>(),
                     0.0
                 );
             }
             
-            // Create a simple source attribution since we're using a single advisor
+            // For source tracking, manually retrieve documents to show what was used
+            Query query = new Query(question);
+            List<Document> retrievedDocuments = multiStoreDocumentRetriever.retrieve(query);
+            
             List<DocumentSource> allSources = new ArrayList<>();
             Map<String, Integer> sourceBreakdown = new HashMap<>();
             
-            // Create a single source entry representing the multi-document search
-            DocumentSource source = new DocumentSource(
-                    "multi-document",
-                    answer,
-                    0.8, // Default confidence
-                    "multi-document-rag",
-                    "Retrieved using single RetrievalAugmentationAdvisor across all stores"
-            );
-            allSources.add(source);
-            sourceBreakdown.put("multi-document", 1);
+            for (int i = 0; i < retrievedDocuments.size(); i++) {
+                Document doc = retrievedDocuments.get(i);
+                
+                String sourceName = doc.getMetadata().getOrDefault("source", "document-" + i).toString();
+                String sourceType = determineSourceType(sourceName);
+                String content = doc.getText();
+                String excerpt = content.length() > 300 ? content.substring(0, 300) + "..." : content;
+                
+                DocumentSource source = new DocumentSource(
+                    sourceName,
+                    excerpt,
+                    0.8,
+                    sourceType,
+                    "Retrieved from " + sourceType
+                );
+                
+                allSources.add(source);
+                sourceBreakdown.merge(sourceType, 1, Integer::sum);
+            }
             
-            logger.info("Successfully generated multi-document response");
-            
+            logger.info("Generated response with " + allSources.size() + " sources");
             return new MultiDocumentResponse(answer, allSources, sourceBreakdown, 0.8);
             
         } catch (Exception e) {
@@ -177,5 +194,36 @@ public class MultiDocumentRAGService {
         }
         
         return queryMultipleStores(demoQueries.get(queryIndex));
+    }
+    
+    /**
+     * Determines the document source type based on the source name/path
+     */
+    private String determineSourceType(String sourceName) {
+        if (sourceName == null) {
+            return "unknown";
+        }
+        
+        String lowerSourceName = sourceName.toLowerCase();
+        
+        if (lowerSourceName.endsWith(".pdf")) {
+            return "PDF";
+        } else if (lowerSourceName.endsWith(".md") || lowerSourceName.endsWith(".markdown")) {
+            return "Markdown";
+        } else if (lowerSourceName.endsWith(".json")) {
+            return "JSON";
+        } else if (lowerSourceName.endsWith(".txt") || lowerSourceName.endsWith(".text")) {
+            return "Text";
+        } else if (lowerSourceName.contains("pdf")) {
+            return "PDF";
+        } else if (lowerSourceName.contains("markdown") || lowerSourceName.contains("md")) {
+            return "Markdown";
+        } else if (lowerSourceName.contains("json")) {
+            return "JSON";
+        } else if (lowerSourceName.contains("text") || lowerSourceName.contains("txt")) {
+            return "Text";
+        } else {
+            return "Document";
+        }
     }
 }
